@@ -1,0 +1,454 @@
+// PharmPlus SaaS - Database Schema
+// Multi-tenant medical scheme administration platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MULTI-TENANT ORGANIZATION MANAGEMENT
+// ============================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  website     String?
+  email       String?
+  phone       String?
+  address     String?
+
+  // Subscription & Billing
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  plan                 Plan      @default(FREE)
+  planExpiresAt        DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  members     Member[]
+  applications Application[]
+  invitations Invitation[]
+  packages    Package[]
+
+  @@index([slug])
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ============================================
+// USER AUTHENTICATION & AUTHORIZATION
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  name          String?
+  image         String?
+  role          UserRole  @default(STAFF)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  assignedApplications Application[] @relation("AssignedReviewer")
+  applicationActions ApplicationAction[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  email          String
+  role           UserRole     @default(STAFF)
+  token          String       @unique
+  expires        DateTime
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([token])
+  @@index([email])
+}
+
+// ============================================
+// MEDICAL SCHEME PACKAGES
+// ============================================
+
+model Package {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  monthlyPremium  Float
+  annualPremium   Float?
+  coverageLimit   Float?
+  features        String?      // JSON string of features
+  isActive        Boolean      @default(true)
+
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  applications    Application[]
+
+  @@index([organizationId])
+}
+
+// ============================================
+// MEMBERS (Applicants/Beneficiaries)
+// ============================================
+
+model Member {
+  id              String       @id @default(cuid())
+  membershipNumber String?     @unique
+
+  // Personal Details
+  title           String?
+  firstName       String
+  surname         String
+  dateOfBirth     DateTime?
+  idNumber        String?
+  ethnicGroup     String?
+  gender          String?
+  maritalStatus   String?
+
+  // Contact Information
+  email           String
+  phoneNumber     String?
+  phoneHome       String?
+  phoneWork       String?
+  cellNumber      String?
+
+  // Addresses
+  physicalAddress String?
+  postalAddress   String?
+  city            String?
+  country         String?
+  postalCode      String?
+
+  // Medical Provider
+  gpName          String?
+  gpPhone         String?
+  gpAddress       String?
+
+  // Employment
+  employerName    String?
+  occupation      String?
+  employeeNumber  String?
+
+  // Documents
+  photoUrl        String?
+  idDocumentUrl   String?
+
+  // Authentication (for member portal)
+  password        String?
+  emailVerified   DateTime?
+
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  applications    Application[]
+  dependents      Dependent[]
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([membershipNumber])
+}
+
+// ============================================
+// APPLICATIONS
+// ============================================
+
+model Application {
+  id                String            @id @default(cuid())
+  applicationNumber String            @unique
+
+  // Application Type
+  applicationType   ApplicationType   @default(NEW_MEMBERSHIP)
+  status            ApplicationStatus @default(DRAFT)
+  priority          Priority          @default(NORMAL)
+
+  // Applicant
+  memberId          String
+  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Package Selection
+  packageId         String?
+  package           Package?          @relation(fields: [packageId], references: [id])
+
+  // Banking Details
+  bankName          String?
+  bankBranch        String?
+  accountNumber     String?
+  branchCode        String?
+  accountType       String?
+
+  // Additional Details
+  registrationStartDate DateTime?
+  planContributions    String?
+
+  // Documents
+  signatureUrl      String?
+  proofOfBankingUrl String?
+  proofOfAddressUrl String?
+  proofOfIncomeUrl  String?
+
+  // Medical History (stored as JSON)
+  medicalHistory    String?
+
+  // Amendment Details
+  amendmentReason   String?
+
+  // Notes
+  internalNotes     String?
+
+  // Assignment
+  assignedToId      String?
+  assignedTo        User?             @relation("AssignedReviewer", fields: [assignedToId], references: [id])
+
+  // Timestamps
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+
+  organizationId    String
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  dependents        ApplicationDependent[]
+  actions           ApplicationAction[]
+
+  @@index([status])
+  @@index([organizationId])
+  @@index([memberId])
+  @@index([applicationNumber])
+}
+
+enum ApplicationType {
+  NEW_MEMBERSHIP
+  CHANGE_PERSONAL_DETAILS
+  CHANGE_BANKING
+  ADD_DEPENDENT
+  REMOVE_DEPENDENT
+  CHANGE_PACKAGE
+  CANCELLATION
+  REINSTATEMENT
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  PENDING_DOCUMENTS
+  PENDING_PAYMENT
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model ApplicationDependent {
+  id              String      @id @default(cuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  dependentId     String?
+  dependent       Dependent?  @relation(fields: [dependentId], references: [id])
+
+  // Dependent details (in case not linked to existing dependent)
+  title           String?
+  firstName       String
+  surname         String
+  dateOfBirth     DateTime?
+  idNumber        String?
+  relationship    String
+  contactNumber   String?
+  type            DependentType @default(ADULT)
+
+  createdAt       DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+model Dependent {
+  id              String       @id @default(cuid())
+
+  title           String?
+  firstName       String
+  surname         String
+  dateOfBirth     DateTime?
+  idNumber        String?
+  relationship    String
+  contactNumber   String?
+  type            DependentType @default(ADULT)
+
+  memberId        String
+  member          Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  applicationDependents ApplicationDependent[]
+
+  @@index([memberId])
+}
+
+enum DependentType {
+  ADULT
+  CHILD
+}
+
+model ApplicationAction {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  action        ActionType
+  notes         String?
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus?
+
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+enum ActionType {
+  CREATED
+  SUBMITTED
+  ASSIGNED
+  REVIEWED
+  REQUESTED_DOCUMENTS
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMMENTED
+  UPDATED
+}
+
+// ============================================
+// AUDIT & NOTIFICATIONS
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  action      String
+  changes     String?  // JSON string
+  userId      String?
+  userEmail   String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType
+  read        Boolean  @default(false)
+  link        String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  APPLICATION_UPDATE
+  SYSTEM
+}
