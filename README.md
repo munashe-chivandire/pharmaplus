@@ -1,101 +1,146 @@
-# PharmPlus Application Viewer
+# PharmPlus - Medical Scheme Administration Platform
 
-A simple web application to view and print PharmPlus job applications.
-
-## What's the CORS Issue?
-
-The CORS (Cross-Origin Resource Sharing) error occurs because web browsers block requests from a webpage (running on `http://127.0.0.1:5500`) to an API on a different domain (`https://www.my.pharmaplus.uk`) unless the API explicitly allows it.
-
-**Solution**: We created a local proxy server that:
-- Runs on your computer
-- Receives requests from the web page
-- Forwards them to the actual API with the API key
-- Returns the response with CORS headers enabled
-
-## How to Use
-
-### Step 1: Set Up Environment Variables
-
-Before starting the proxy server, you need to set your API key as an environment variable.
-
-**Option A: Create a .env file (Recommended)**
-1. Copy `.env.example` to create a new file called `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open `.env` and replace `your_api_key_here` with your actual API key
-3. The `.env` file is automatically ignored by git and won't be committed
-
-**Option B: Set environment variable manually**
-
-**Windows (Command Prompt):**
-```bash
-set API_KEY=your_api_key_here
-```
-
-**Windows (PowerShell):**
-```powershell
-$env:API_KEY="your_api_key_here"
-```
-
-**Mac/Linux:**
-```bash
-export API_KEY=your_api_key_here
-```
-
-**Note:** Replace `your_api_key_here` with your actual PharmPlus API key.
-
-### Step 2: Start the Proxy Server
-
-Open a terminal in this folder and run:
-
-```bash
-node proxy-server.js
-```
-
-You should see:
-```
-Proxy server running at http://localhost:3000
-Open application-viewer.html in your browser and click "Load Applications"
-```
-
-### Step 2: Open the Application Viewer
-
-- Open `application-viewer.html` in your browser
-- Click "Load Applications" button
-- Select an application from the list to view details
-- Click "Print Selected" to print the application
-
-## Files
-
-- `application-viewer.html` - The main viewer interface
-- `proxy-server.js` - The local proxy server to bypass CORS
-- `README.md` - This file
+A comprehensive SaaS platform for managing medical scheme membership applications, member management, and healthcare benefits administration.
 
 ## Features
 
-- Fetches all applications from the API
-- Displays applications in a clean, organized format
-- Print-friendly layout
-- Sections include:
-  - Personal Information
-  - Professional Information
-  - References
-  - Documents
-  - Application Status
-  - Complete JSON data
+### Core Functionality
+- **Application Management** - Process membership applications with automated workflows
+- **Member Portal** - Self-service portal for members to submit applications and track status
+- **Admin Dashboard** - Comprehensive dashboard with real-time analytics
+- **Multi-tenant Architecture** - Support multiple organizations with isolated data
 
-## Troubleshooting
+### Application Workflow
+- New membership applications
+- Add/remove dependents
+- Package changes
+- Banking detail updates
+- Application approval/rejection workflow
 
-**Error: "Make sure the proxy server is running"**
-- Ensure you've started the proxy server with `node proxy-server.js`
-- Check that it's running on port 3000
+### Payment Integration (Zimbabwe)
+- **EcoCash** - Mobile money payments
+- **OneMoney** - Mobile money payments
+- **InnBucks** - Digital wallet payments
+- **Visa/Mastercard** - Card payments
+- **Bank Transfer** - Direct bank transfers
+- Powered by **Paynow Zimbabwe**
 
-**Error: "ECONNREFUSED"**
-- The proxy server is not running or crashed
-- Restart it with `node proxy-server.js`
+### Analytics & Reporting
+- Application statistics
+- Member demographics
+- Revenue tracking
+- Approval rates
+- Custom reports
 
-**No applications showing**
-- Check the browser console for errors
-- Verify the API is accessible
-- Check the proxy server terminal for error messages
+## Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **ORM**: Prisma
+- **Authentication**: NextAuth.js
+- **Payment Gateway**: Paynow Zimbabwe
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-repo/pharmaplus.git
+cd pharmaplus
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+```
+
+4. Configure your `.env` file:
+```env
+DATABASE_URL="file:./dev.db"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-key"
+PAYNOW_INTEGRATION_ID="your-paynow-id"
+PAYNOW_INTEGRATION_KEY="your-paynow-key"
+```
+
+5. Initialize the database:
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+6. Run the development server:
+```bash
+npm run dev
+```
+
+7. Open [http://localhost:3000](http://localhost:3000)
+
+## Project Structure
+
+```
+pharmaplus/
+├── prisma/
+│   └── schema.prisma      # Database schema
+├── src/
+│   ├── app/               # Next.js app router pages
+│   │   ├── (auth)/        # Authentication pages
+│   │   ├── (dashboard)/   # Dashboard pages
+│   │   └── api/           # API routes
+│   ├── components/
+│   │   ├── layout/        # Layout components
+│   │   └── ui/            # UI components
+│   ├── lib/               # Utilities and configurations
+│   │   ├── auth.ts        # NextAuth configuration
+│   │   ├── db.ts          # Prisma client
+│   │   ├── paynow.ts      # Paynow integration
+│   │   └── utils.ts       # Helper functions
+│   └── types/             # TypeScript type definitions
+├── public/                # Static assets
+└── package.json
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+- `npx prisma studio` - Open Prisma Studio (database GUI)
+
+## Subscription Plans
+
+| Plan | Price (USD) | Price (ZWL) | Members |
+|------|-------------|-------------|---------|
+| Starter | $99/mo | ZWL 2,500/mo | Up to 500 |
+| Professional | $299/mo | ZWL 7,500/mo | Up to 5,000 |
+| Enterprise | $599/mo | ZWL 15,000/mo | Unlimited |
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is proprietary software. All rights reserved.
+
+## Support
+
+For support, email support@pharmplus.co.zw or visit our [documentation](https://docs.pharmplus.co.zw).
