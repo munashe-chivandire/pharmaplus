@@ -1,0 +1,94 @@
+# PharmPlus Docker Compose Configuration
+# Development and production setup
+
+version: "3.8"
+
+services:
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://pharmplus:pharmplus@db:5432/pharmplus
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-key-change-in-production}
+      - NODE_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pharmplus-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=pharmplus
+      - POSTGRES_PASSWORD=pharmplus
+      - POSTGRES_DB=pharmplus
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - pharmplus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pharmplus -d pharmplus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and sessions (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - pharmplus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Development only - Prisma Studio
+  prisma-studio:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql://pharmplus:pharmplus@db:5432/pharmplus
+    depends_on:
+      - db
+    command: npx prisma studio --port 5555
+    profiles:
+      - dev
+    networks:
+      - pharmplus-network
+
+networks:
+  pharmplus-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
